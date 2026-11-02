@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="290 175 540 440" width="540" height="440">
+  <defs>
+    <linearGradient id="orange" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#FF8A00"/>
+      <stop offset="1" stop-color="#FF5E00"/>
+    </linearGradient>
+    <linearGradient id="orangeMid" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FF6A00"/>
+      <stop offset="1" stop-color="#FF8C00"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#B01FC0"/>
+      <stop offset="0.55" stop-color="#7A12A8"/>
+      <stop offset="1" stop-color="#3E0C78"/>
+    </linearGradient>
+    <linearGradient id="stem" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6A0FA0"/>
+      <stop offset="1" stop-color="#3A0A70"/>
+    </linearGradient>
+  </defs>
+
+  <!-- F: top bar + stem -->
+  <path fill="url(#orange)" d="M310,265 Q310,195 380,195 L682,195 L577,300 L405,300 L405,525 Q405,595 335,595 L310,595 Z"/>
+  <!-- F: fold shading at the joint -->
+  <path fill="#D94A00" opacity="0.35" d="M310,300 L405,300 L405,440 Z"/>
+  <!-- F: middle bar -->
+  <path fill="url(#orangeMid)" d="M405,370 L545,370 L490,445 L405,445 Z"/>
+
+  <!-- M -->
+  <path fill="url(#purple)" d="M545,370 L612,440 L742,302 Q764,282 788,285 Q808,290 808,318 L808,580 Q808,600 788,600 L742,600 Q722,600 722,580 L722,470 L642,548 Q612,572 582,545 L490,445 Z"/>
+  <!-- M: fold shading on right stem -->
+  <path fill="#2A0656" opacity="0.28" d="M722,395 L808,318 L808,580 Q808,600 788,600 L742,600 Q722,600 722,580 Z"/>
+</svg>

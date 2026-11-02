@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+/* =========================================================
+   FOODMART STOREFRONT - DESIGN TOKENS
+   From the FoodMart home design (desktop / tablet / mobile):
+   white page with soft orange & purple glows, deep navy
+   headings, orange primary, purple secondary, rounded cards,
+   dark aubergine footer.
+========================================================= */
+
+@theme {
+  --font-sans: var(--font-poppins), "Poppins", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-script: var(--font-caveat), "Segoe Script", "Brush Script MT", cursive;
+
+  --breakpoint-xs: 420px;
+
+  /* Primary - FoodMart orange */
+  --color-brand-50: #fff4ec;
+  --color-brand-100: #ffe6d4;
+  --color-brand-200: #ffc9a3;
+  --color-brand-300: #ffa66b;
+  --color-brand-400: #ff8a3d;
+  --color-brand-500: #ff6b1a;
+  --color-brand-600: #f05a0a;
+  --color-brand-700: #c7460a;
+
+  /* Secondary - FoodMart purple */
+  --color-grape-50: #f4efff;
+  --color-grape-100: #e9dfff;
+  --color-grape-200: #d3bfff;
+  --color-grape-300: #b393ff;
+  --color-grape-400: #9461fb;
+  --color-grape-500: #7c3aed;
+  --color-grape-600: #6d28d9;
+  --color-grape-700: #5b21b6;
+
+  /* Headings / dark surfaces */
+  --color-navy-700: #2f2466;
+  --color-navy-800: #221a4d;
+  --color-navy-900: #17113a;
+  --color-night-800: #241338;
+  --color-night-900: #1b0f2e;
+  --color-night-950: #12091f;
+
+  /* Neutrals (slightly purple tinted) */
+  --color-ink-50: #f8f6fc;
+  --color-ink-100: #f0ecf7;
+  --color-ink-200: #e3dced;
+  --color-ink-300: #cbc1da;
+  --color-ink-400: #9c91b0;
+  --color-ink-500: #6f6585;
+  --color-ink-600: #514866;
+  --color-ink-700: #382f4b;
+  --color-ink-800: #241c34;
+  --color-ink-900: #160f23;
+
+  --color-success-50: #ecfdf3;
+  --color-success-500: #12b76a;
+  --color-success-600: #039855;
+  --color-danger-50: #fef3f2;
+  --color-danger-500: #f04438;
+  --color-danger-600: #d92d20;
+  --color-warning-50: #fffaeb;
+  --color-warning-400: #fdb022;
+  --color-warning-500: #f79009;
+  --color-warning-600: #dc6803;
+  --color-info-50: #eff4ff;
+  --color-info-500: #4f6ef7;
+
+  --radius-4xl: 28px;
+
+  --shadow-card: 0 1px 2px rgba(23, 17, 58, 0.04), 0 8px 24px rgba(23, 17, 58, 0.06);
+  --shadow-pop: 0 18px 40px rgba(23, 17, 58, 0.18);
+  --shadow-glow: 0 10px 24px rgba(255, 107, 26, 0.35);
+  --shadow-grape: 0 10px 24px rgba(109, 40, 217, 0.3);
+
+  --animate-fade-up: fade-up 0.45s ease both;
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white font-sans text-ink-800 antialiased;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .container-fm {
+    @apply mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-8;
+  }
+
+  .card {
+    @apply rounded-2xl border border-ink-100 bg-white shadow-card;
+  }
+
+  .brand-gradient {
+    background: linear-gradient(135deg, #ff9a3d 0%, #ff6b1a 55%, #f05a0a 100%);
+  }
+
+  .grape-gradient {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 55%, #5b21b6 100%);
+  }
+
+  .text-brand-gradient {
+    background: linear-gradient(90deg, #ff8a00 0%, #ff5e00 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .footer-gradient {
+    background: linear-gradient(135deg, #1d1033 0%, #24123f 50%, #1a0d2c 100%);
+  }
+
+  /* soft orange / purple glows behind the hero (design background) */
+  .hero-glow {
+    background:
+      radial-gradient(40% 55% at 82% 30%, rgba(255, 138, 61, 0.22) 0%, transparent 70%),
+      radial-gradient(35% 50% at 95% 75%, rgba(124, 58, 237, 0.18) 0%, transparent 70%),
+      radial-gradient(30% 40% at 0% 100%, rgba(255, 107, 26, 0.08) 0%, transparent 70%);
+  }
+
+  .reel-shade {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0) 28%, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.82) 100%);
+  }
+
+  .field {
+    @apply h-11 w-full rounded-xl border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-300 focus:ring-4 focus:ring-brand-100 disabled:bg-ink-50;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-700;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded-xl bg-ink-100;
+  }
+
+  .snap-row {
+    @apply flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth sm:gap-4;
+    scrollbar-width: none;
+  }
+  .snap-row::-webkit-scrollbar {
+    display: none;
+  }
+  .snap-row > * {
+    @apply snap-start;
+  }
+}
+
+/* utilities (usable with variants, e.g. md:no-scrollbar) */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
