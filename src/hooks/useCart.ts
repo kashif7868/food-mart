@@ -8,6 +8,7 @@ import { cartApi } from "@/services/foodmart";
 import { useAuthStore } from "@/store/authStore";
 import type { CartView } from "@/lib/types";
 import { useRequireAuth } from "./useRequireAuth";
+import { OWN_PROFILE_MESSAGE, useManagedProfileIds } from "./useOwnership";
 
 /* =========================================================
    CART (server side - one seller per cart)
@@ -25,6 +26,7 @@ export const cartCount = (cart?: CartView | null) => (cart?.items || []).reduce(
 export function useAddToCart() {
   const qc = useQueryClient();
   const ensureAuth = useRequireAuth();
+  const managed = useManagedProfileIds();
   const mutation = useMutation({
     mutationFn: ({ foodId, quantity = 1, replaceCart = false }: { foodId: string; quantity?: number; replaceCart?: boolean; name?: string }) => cartApi.add(foodId, quantity, replaceCart),
     onSuccess: (cart, vars) => {
@@ -32,6 +34,10 @@ export function useAddToCart() {
       toast.success(`${vars.name || "Item"} added to cart`, { action: { label: "View cart", onClick: () => (window.location.href = "/cart") } });
     },
     onError: (error, vars) => {
+      if (getErrorCode(error) === "OWN_PROFILE") {
+        toast.info(OWN_PROFILE_MESSAGE);
+        return;
+      }
       if (getErrorCode(error) === "CART_SELLER_CONFLICT") {
         toast("Your cart has items from another restaurant", {
           description: "Start a new cart with this item?",
@@ -44,9 +50,29 @@ export function useAddToCart() {
   });
   return {
     ...mutation,
-    add: (foodId: string, name?: string, quantity = 1) => {
-      if (!ensureAuth("Sign in to order food")) return;
+    /* sellerId (optional) lets the UI explain right away when the food belongs to the user's own profile */
+    add: (foodId: string, name?: string, quantity = 1, sellerId?: string) => {
+      if (!ensureAuth("Sign in to order food")) return false;
+      if (sellerId && managed.has(String(sellerId))) {
+        toast.info(OWN_PROFILE_MESSAGE);
+        return false;
+      }
       mutation.mutate({ foodId, name, quantity });
+      return true;
+    },
+    /* Same as add() but resolves true when the item really is in the cart (for "Order now") */
+    addAndWait: async (foodId: string, name?: string, quantity = 1, sellerId?: string) => {
+      if (!ensureAuth("Sign in to order food")) return false;
+      if (sellerId && managed.has(String(sellerId))) {
+        toast.info(OWN_PROFILE_MESSAGE);
+        return false;
+      }
+      try {
+        await mutation.mutateAsync({ foodId, name, quantity });
+        return true;
+      } catch {
+        return false;
+      }
     },
   };
 }

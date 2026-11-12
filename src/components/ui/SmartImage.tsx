@@ -3,13 +3,14 @@
 import Image from "next/image";
 import { useState } from "react";
 
-import { CUISINE_BG, FoodArt, cuisineFor, type CuisineKey } from "@/components/brand/FoodArt";
+import { cuisineFor, type CuisineKey } from "@/components/brand/FoodArt";
+import { FoodPhoto } from "@/components/ui/FoodPhoto";
 import { cn } from "@/lib/utils";
 
 /* =========================================================
    SMART IMAGE
    Shows the uploaded photo (backend media URL). When there is no
-   photo, or it fails to load, a matching food illustration is shown
+   photo, or it fails to load, a matching real food photo is shown
    instead, so cards always look complete.
    The parent decides the size: SmartImage fills it.
 ========================================================= */
@@ -21,7 +22,6 @@ export function SmartImage({
   kind,
   className,
   imgClassName,
-  dark = false,
   priority = false,
   sizes = "(max-width: 768px) 50vw, 320px",
 }: {
@@ -31,7 +31,6 @@ export function SmartImage({
   kind?: CuisineKey;
   className?: string;
   imgClassName?: string;
-  dark?: boolean; // dark backdrop for reel cards
   priority?: boolean;
   sizes?: string;
 }) {
@@ -44,9 +43,7 @@ export function SmartImage({
       {showPhoto ? (
         <Image src={src as string} alt={alt} fill sizes={sizes} priority={priority} className={cn("object-cover", imgClassName)} onError={() => setFailed(true)} />
       ) : (
-        <div className={cn("absolute inset-0 flex items-center justify-center bg-gradient-to-br", dark ? "from-[#3a1d10] via-[#24120b] to-[#140906]" : CUISINE_BG[art])}>
-          <FoodArt kind={art} className={cn("max-h-[78%] max-w-[78%] drop-shadow-xl", dark && "max-h-[62%] max-w-[62%]")} />
-        </div>
+        <FoodPhoto kind={art} seed={`${hint || ""}${alt}`} alt={alt} className="absolute inset-0 h-full w-full" />
       )}
     </div>
   );

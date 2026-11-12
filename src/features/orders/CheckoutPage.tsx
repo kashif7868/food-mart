@@ -4,12 +4,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { LuBanknote, LuBike, LuCheck, LuMapPin, LuShoppingBag } from "react-icons/lu";
+import { LuBanknote, LuBike, LuCheck, LuCreditCard, LuMapPin, LuShoppingBag, LuSmartphone } from "react-icons/lu";
 
 import { Button, ButtonLink, EmptyState, Field, Input, PageHeading, PageLoader, TextArea } from "@/components/ui";
 import { CART_KEY, useCart } from "@/hooks/useCart";
 import { getErrorMessage } from "@/services/api";
-import { accountApi, orderApi } from "@/services/foodmart";
+import { accountApi, orderApi, paymentApi, type PaymentMethodInfo } from "@/services/foodmart";
 import { cn, formatPKR } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { CITIES, useLocationStore } from "@/store/locationStore";
@@ -33,6 +33,8 @@ export default function CheckoutPage() {
   const cart = useCart();
   const addresses = useQuery({ queryKey: ["addresses"], queryFn: accountApi.addresses, enabled: Boolean(user) });
   const c = cart.data;
+  const methods = useQuery({ queryKey: ["payment-methods", c?.seller?._id], queryFn: () => paymentApi.methods(c?.seller?._id), enabled: Boolean(c?.seller?._id) });
+  const [payment, setPayment] = useState<PaymentMethodInfo["method"] | "">("");
   const deliveryAvailable = Boolean(c?.fulfillmentOptions?.delivery && c?.totals?.delivery);
   const pickupAvailable = Boolean(c?.fulfillmentOptions?.pickup && c?.totals?.pickup);
   const [mode, setMode] = useState<"DELIVERY" | "PICKUP">(params.get("mode") === "pickup" ? "PICKUP" : "DELIVERY");
@@ -55,6 +57,14 @@ export default function CheckoutPage() {
     if (user?.phone && !phone) setPhone(user.phone);
   }, [user, phone]);
 
+  /* methods the seller can take for this fulfilment type; cash is always first */
+  const options = useMemo(() => {
+    const cash = mode === "DELIVERY" ? "CASH_ON_DELIVERY" : "CASH_ON_PICKUP";
+    const list = (methods.data || []).filter((m) => m.available && (m.kind !== "CASH" || m.method === cash));
+    return list.length ? list : ([{ method: cash, available: true, kind: "CASH" }] as PaymentMethodInfo[]);
+  }, [methods.data, mode]);
+  const chosen = options.find((o) => o.method === payment)?.method || options[0]?.method;
+
   const totals = useMemo(() => (mode === "DELIVERY" ? c?.totals?.delivery : c?.totals?.pickup), [mode, c]);
   useEffect(() => {
     if (ready && !user) router.replace("/login?next=/checkout");
@@ -64,26 +74,37 @@ export default function CheckoutPage() {
   if (!c?.items.length) return <div className="container-fm py-10"><EmptyState icon={<LuShoppingBag />} title="Your cart is empty" action={<ButtonLink href="/explore">Explore food</ButtonLink>} /></div>;
 
   const place = async () => {
-    if (mode === "DELIVERY" && addressId === "new" && (newAddress.line1.trim().length < 3 || !newAddress.city)) {
+    const usingNewAddress = addressId === "new" || !addresses.data?.length || !addressId;
+    if (mode === "DELIVERY" && usingNewAddress && (newAddress.line1.trim().length < 3 || !newAddress.city)) {
       toast.error("Add your delivery address.");
+      return;
+    }
+    if (mode === "DELIVERY" && !(phone || newAddress.phone).trim()) {
+      toast.error("Add a phone number so the rider can reach you.");
       return;
     }
     setPlacing(true);
     try {
       const body: Record<string, unknown> = {
         fulfillmentType: mode,
-        paymentMethod: mode === "DELIVERY" ? "CASH_ON_DELIVERY" : "CASH_ON_PICKUP",
+        paymentMethod: chosen,
         contactPhone: phone || undefined,
         notes: notes || undefined,
       };
       if (mode === "DELIVERY") {
-        if (addressId && addressId !== "new") body.addressId = addressId;
+        if (!usingNewAddress) body.addressId = addressId;
         else body.deliveryAddress = { line1: [newAddress.line1, newAddress.area].filter(Boolean).join(", "), city: newAddress.city, phone: newAddress.phone || phone || undefined };
       }
       const order = await orderApi.checkout(body, key.current);
       qc.setQueryData(CART_KEY, { ...c, items: [], totals: null, canCheckout: false });
       void qc.invalidateQueries({ queryKey: ["orders"] });
-      toast.success("Order placed! The restaurant will confirm shortly.");
+      const action = order.paymentAction;
+      if (action?.type === "REDIRECT" && action.url) {
+        toast.success("Order placed. Opening the secure card page...");
+        window.location.href = action.url;
+        return;
+      }
+      toast.success(action?.type === "WALLET_INSTRUCTIONS" ? "Order placed. Send the payment and submit the transaction ID." : "Order placed! The restaurant will confirm shortly.");
       router.replace(`/orders/${order._id}?placed=1`);
     } catch (error) {
       toast.error(getErrorMessage(error));
@@ -167,12 +188,21 @@ export default function CheckoutPage() {
               <Field label="Phone number">
                 <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="03xx xxxxxxx" />
               </Field>
-              <div className="flex items-center gap-3 rounded-2xl border border-success-100 bg-success-50 p-3 text-sm text-success-600">
-                <LuBanknote className="text-2xl" />
-                <span>
-                  <b className="block">{mode === "DELIVERY" ? "Cash on delivery" : "Cash on pickup"}</b>
-                  <span className="text-xs">Online payments are coming soon</span>
-                </span>
+              <div className="space-y-2 sm:col-span-2">
+                <span className="label">Payment method</span>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {options.map((m) => {
+                    const Icon = m.kind === "CASH" ? LuBanknote : m.kind === "CARD" ? LuCreditCard : LuSmartphone;
+                    const text = m.method === "CASH_ON_DELIVERY" ? "Cash on delivery" : m.method === "CASH_ON_PICKUP" ? "Cash on pickup" : m.method === "CARD" ? "Card (Visa / Mastercard)" : m.method === "JAZZCASH" ? "JazzCash" : "Easypaisa";
+                    return (
+                      <button type="button" key={m.method} onClick={() => setPayment(m.method)} className={cn("flex items-center gap-3 rounded-2xl border p-3 text-left text-sm transition", chosen === m.method ? "border-brand-400 bg-brand-50 ring-2 ring-brand-100" : "border-ink-200")}>
+                        <Icon className="text-2xl text-brand-500" />
+                        <b className="text-navy-900">{text}</b>
+                      </button>
+                    );
+                  })}
+                </div>
+                {chosen === "JAZZCASH" || chosen === "EASYPAISA" ? <p className="text-xs text-ink-500">You will see the account number after placing the order, then submit your transaction ID.</p> : null}
               </div>
               <Field label="Notes for the kitchen (optional)" className="sm:col-span-2">
                 <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Less spicy please, ring the bell..." className="min-h-20" />

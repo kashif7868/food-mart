@@ -2,6 +2,8 @@
 
 import { create } from "zustand";
 
+import { DEFAULT_CITY } from "@/lib/config";
+
 /* =========================================================
    LOCATION STORE
    The city shown in the header ("Karachi, Pakistan"). Used for
@@ -10,7 +12,6 @@ import { create } from "zustand";
 ========================================================= */
 
 const KEY = "fm_city";
-const DEFAULT_CITY = process.env.NEXT_PUBLIC_DEFAULT_CITY || "Karachi";
 
 export const CITIES = [
   "Karachi",

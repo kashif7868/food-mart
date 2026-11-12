@@ -29,22 +29,48 @@ npm run dev                    # http://localhost:3000
 
 Start the backend first (`npm run dev` in `foodmart-backend`).
 
-### Environment variables (`.env.local`)
+### Environment variables (`.env.local` / Vercel settings)
 
 | Variable | Example | Notes |
 | --- | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:5000/api/v1` | Backend API base URL |
-| `NEXT_PUBLIC_DASHBOARD_URL` | `http://localhost:5173` | Used by "Partner dashboard" links and the partner sign-up success screen |
+| `NEXT_PUBLIC_API_BASE_URL` | `https://api.yourdomain.com/api/v1` | Backend API base URL (or `/api/v1` when using the proxy below) |
+| `API_PROXY_TARGET` | `https://api.yourdomain.com` | Optional. Forwards `/api/v1/*` and `/uploads/*` through this site so no CORS setup is needed |
+| `NEXT_PUBLIC_DASHBOARD_URL` | `https://panel.yourdomain.com` | "Partner dashboard" / "FoodMart panel" links and the partner sign-up screen |
+| `NEXT_PUBLIC_SITE_URL` | `https://yourdomain.com` | Public URL of this site (metadata, links) |
 | `NEXT_PUBLIC_DEFAULT_CITY` | `Karachi` | City used until the visitor picks one |
 
-Never commit `.env.local`. Only `.env.example` belongs in git.
+`NEXT_PUBLIC_*` values are baked into the build: after changing them in Vercel, **redeploy**. Never commit `.env.local`. `.env.example` and `.env.production.example` are safe templates.
 
-### Backend settings this app relies on
+### Connect your own domain (checklist)
 
-In `foodmart-backend/.env`:
+1. **Backend** (own server/VPS/Render/etc.) reachable at e.g. `https://api.yourdomain.com` (HTTPS).
+2. **Backend `.env`**:
+   - `FRONTEND_URL=https://yourdomain.com,https://www.yourdomain.com` (comma separated, used for CORS)
+   - `DASHBOARD_URL=https://panel.yourdomain.com`
+   - `APP_PUBLIC_URL=https://yourdomain.com` (links in emails, Stripe return URLs)
+   - `PUBLIC_BASE_URL=https://api.yourdomain.com`
+   - `TRUST_PROXY=true` when behind Nginx/Cloudflare/Render
+3. **Vercel (this site)**: add the variables above (`NEXT_PUBLIC_API_BASE_URL=https://api.yourdomain.com/api/v1`, dashboard and site URLs), add your domain under *Settings > Domains*, then redeploy.
+4. **Dashboard**: set `VITE_API_BASE_URL=https://api.yourdomain.com/api/v1` and `VITE_STOREFRONT_URL=https://yourdomain.com`.
+5. **Stripe**: webhook endpoint `https://api.yourdomain.com/api/v1/webhooks/stripe`.
+6. Prefer no CORS at all? Set `NEXT_PUBLIC_API_BASE_URL=/api/v1` and `API_PROXY_TARGET=https://api.yourdomain.com`.
 
-- `FRONTEND_URL=http://localhost:3000` allows this site through CORS. In production, set it to your real storefront domain. Comma-separated values are allowed.
-- `APP_PUBLIC_URL=http://localhost:3000`. Verification and password-reset emails link to `APP_PUBLIC_URL/verify-email?token=…` and `APP_PUBLIC_URL/reset-password?token=…`, and both pages exist in this app.
+If the site shows "Cannot reach the FoodMart server", the API URL is wrong, the backend is down, or CORS (`FRONTEND_URL`) does not include your domain.
+
+### Payments in the storefront
+
+Checkout offers the methods the seller accepts (`GET /payments/methods`): cash, card (Stripe Checkout redirect) and JazzCash / Easypaisa. For wallets the order page shows the account number and a form for the transaction ID; the seller confirms it in the dashboard. After Stripe the customer returns to `/orders/:id?payment=success` and the payment is verified automatically.
+
+### Languages (English / اردو) and dark theme
+
+- The header has a language button and a theme button (mobile: in the header and in the menu drawer). The choice is saved in the browser and applied before the page paints.
+- Urdu switches the whole site to right-to-left with the Noto Naskh Arabic font. Texts are translated live from the dictionary in `src/lib/ur.ts` (`components/layout/Translator.tsx`). A text that is not in the dictionary simply stays in English; to translate it, add `"English text": "اردو متن"` to `ur.ts`. Dynamic texts use the `UR_PATTERNS` list in the same file.
+- The assistant gets the selected language and answers in Urdu when the AI model key is configured on the backend.
+- Dark theme swaps the colour tokens in `globals.css` (`html.dark`), so every page follows it. It starts from the visitor's system preference.
+
+### Mobile menu
+
+The menu drawer renders in a portal on `<body>`. (Inside the sticky blurred header, `position: fixed` was clipped to the header height.)
 
 ### Scripts
 
@@ -128,3 +154,7 @@ src/
 ## Status of this build
 
 The UI was checked page by page in a browser preview at desktop (1440px), tablet (834px) and mobile (390px) widths, using sample data shaped like the backend's responses. Imports, icons and API routes were checked by script, and the code was type-checked against stand-in type declarations. `npm install` and `next build` could not be run in the environment where this was made, so run `npm install && npm run build` once on your machine and send any error output if something comes up.
+
+## Images & language
+- No cartoon art any more: missing photos fall back to real food photos (`src/lib/photos.ts`, Unsplash License). For production copy the photos you keep into `public/` or upload your own from the dashboard.
+- Language is a globe-icon dropdown (English / اردو) in the header.

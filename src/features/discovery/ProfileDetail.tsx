@@ -23,6 +23,8 @@ import { DishCard, OfferBanner, ReelCard } from "@/components/cards/Cards";
 import { Avatar, Badge, Button, EmptyState, ErrorState, PageLoader, Rating, Skeleton, Stars, Tabs } from "@/components/ui";
 import { SmartImage } from "@/components/ui/SmartImage";
 import { useFollow } from "@/hooks/useSocial";
+import { useIsMine } from "@/hooks/useOwnership";
+import { DASHBOARD_URL } from "@/lib/config";
 import { getErrorMessage } from "@/services/api";
 import { catalogApi, discoveryApi, reviewApi, socialApi } from "@/services/foodmart";
 import { cuisineLine, formatCompact, formatPKR, primaryImage, profileRating, PROFILE_TYPE_LABEL, timeAgo, titleCase } from "@/lib/utils";
@@ -102,6 +104,7 @@ function ProfileView({ profile: p }: { profile: Profile & { viewer?: { isFollowi
   const isBlogger = p.profileType === "BLOGGER";
   const [tab, setTab] = useState<Tab>(isBlogger ? "posts" : "menu");
   const follow = useFollow(p._id, Boolean(p.viewer?.isFollowing));
+  const mine = useIsMine(p._id);
   const foods = useQuery({ queryKey: ["profile-foods", p._id], queryFn: () => catalogApi.profileFoods(p._id), enabled: !isBlogger });
   const deals = useQuery({ queryKey: ["profile-deals", p._id], queryFn: () => catalogApi.profileDeals(p._id), enabled: !isBlogger });
   const posts = useQuery({ queryKey: ["profile-posts", p._id], queryFn: () => socialApi.profilePosts(p._id, { limit: 24 }), enabled: tab === "posts" });
@@ -148,7 +151,7 @@ function ProfileView({ profile: p }: { profile: Profile & { viewer?: { isFollowi
     <div className="pb-10">
       {/* cover */}
       <div className="relative h-44 sm:h-60 lg:h-72">
-        <SmartImage src={p.cover?.url} alt={p.displayName} hint={(p.cuisines || []).join(" ")} dark={!p.cover?.url} className="absolute inset-0" sizes="100vw" priority />
+        <SmartImage src={p.cover?.url} alt={p.displayName} hint={(p.cuisines || []).join(" ")} className="absolute inset-0" sizes="100vw" priority />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
       </div>
       <div className="container-fm">
@@ -180,9 +183,15 @@ function ProfileView({ profile: p }: { profile: Profile & { viewer?: { isFollowi
             </div>
           </div>
           <div className="flex gap-2 md:pt-4">
-            <Button variant={follow.on ? "outline" : "primary"} onClick={follow.toggle} loading={follow.busy}>
-              {follow.on ? "Following" : "Follow"}
-            </Button>
+            {mine ? (
+              <a href={DASHBOARD_URL} target="_blank" rel="noreferrer" className="inline-flex items-center rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-glow hover:bg-brand-600">
+                Manage in dashboard
+              </a>
+            ) : (
+              <Button variant={follow.on ? "outline" : "primary"} onClick={follow.toggle} loading={follow.busy}>
+                {follow.on ? "Following" : "Follow"}
+              </Button>
+            )}
             <Button variant="outline" icon={<LuShare2 />} onClick={share} aria-label="Share">
               <span className="hidden sm:inline">Share</span>
             </Button>
@@ -224,11 +233,19 @@ function ProfileView({ profile: p }: { profile: Profile & { viewer?: { isFollowi
         {deals.data?.length ? (
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {deals.data.slice(0, 2).map((d) => (
-              <OfferBanner key={d._id} deal={{ ...d, profile: p, foods: (d as never as { foods?: [] }).foods || [] } as never} />
+              <OfferBanner
+                key={d._id}
+                onMenu={() => {
+                  setTab("menu");
+                  document.getElementById("menu")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                deal={{ ...d, profile: p, foods: (d as never as { foods?: [] }).foods || [] } as never}
+              />
             ))}
           </div>
         ) : null}
 
+        <div id="menu" className="scroll-mt-24" />
         <Tabs className="mt-6 w-fit" value={tab} onChange={setTab} tabs={tabs} />
 
         <div className="mt-5">
@@ -240,7 +257,7 @@ function ProfileView({ profile: p }: { profile: Profile & { viewer?: { isFollowi
                 ))}
               </div>
             ) : !foods.data?.length ? (
-              <EmptyState icon={<LuStore />} title="Menu coming soon" text={`${p.displayName} has not added dishes yet.`} />
+              <EmptyState icon={<LuStore />} title="Menu coming soon" text={mine ? "You have not added dishes yet. Add them from the dashboard (Menu) so customers can order." : `${p.displayName} has not added dishes yet.`} />
             ) : (
               <div className="space-y-8">
                 {categories.map(([name, list]) => (

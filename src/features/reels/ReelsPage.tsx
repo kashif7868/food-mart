@@ -3,15 +3,15 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { LuBookmark, LuHeart, LuMessageCircle, LuPlay, LuSend, LuShare2, LuShoppingBag, LuVolume2, LuVolumeX } from "react-icons/lu";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { LuBookmark, LuHeart, LuMessageCircle, LuPlay, LuRotateCw, LuShare2, LuShoppingBag, LuVolume2, LuVolumeX } from "react-icons/lu";
 
-import { Avatar, Button, Modal, Spinner } from "@/components/ui";
+import { Avatar, Spinner } from "@/components/ui";
+import { CommentsSheet } from "./CommentsSheet";
 import { SmartImage } from "@/components/ui/SmartImage";
 import { useFollow, useLike, useSavePost } from "@/hooks/useSocial";
-import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { getErrorMessage } from "@/services/api";
+import { useIsMine } from "@/hooks/useOwnership";
 import { socialApi } from "@/services/foodmart";
 import { cn, formatCompact, formatPKR, primaryImage, profilePath, PROFILE_TYPE_LABEL, timeAgo } from "@/lib/utils";
 import type { Post } from "@/lib/types";
@@ -21,61 +21,6 @@ import type { Post } from "@/lib/types";
    Backend: GET /reels/feed (cursor), GET /posts/:id, like/save,
    follow, POST /posts/:id/view (after 3 s), comments, share.
 ========================================================= */
-
-function Comments({ post, open, onClose }: { post: Post; open: boolean; onClose: () => void }) {
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const ensureAuth = useRequireAuth();
-  const list = useQuery({ queryKey: ["comments", post._id], queryFn: () => socialApi.comments(post._id), enabled: open });
-  const send = async () => {
-    if (!ensureAuth("Sign in to comment") || !text.trim()) return;
-    setSending(true);
-    try {
-      await socialApi.comment(post._id, text.trim());
-      setText("");
-      list.refetch();
-    } catch (error) {
-      toast.error(getErrorMessage(error));
-    } finally {
-      setSending(false);
-    }
-  };
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`${formatCompact(post.stats.comments)} comments`}
-      footer={
-        <div className="flex w-full gap-2">
-          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Add a comment..." className="field flex-1 rounded-full" />
-          <Button onClick={send} loading={sending} icon={<LuSend />} aria-label="Send" />
-        </div>
-      }
-    >
-      {list.isLoading ? (
-        <div className="flex justify-center py-8">
-          <Spinner />
-        </div>
-      ) : !list.data?.items.length ? (
-        <p className="py-8 text-center text-sm text-ink-500">No comments yet. Be the first!</p>
-      ) : (
-        <ul className="space-y-4">
-          {list.data.items.map((c: any) => (
-            <li key={c._id} className="flex gap-3">
-              <Avatar name={c.user?.name || c.author?.displayName} src={c.user?.avatar?.url} size={34} />
-              <div>
-                <p className="text-xs">
-                  <b className="text-navy-900">{c.user?.name || c.author?.displayName || "Foodie"}</b> <span className="text-ink-400">{timeAgo(c.createdAt)}</span>
-                </p>
-                <p className="text-sm text-ink-700">{c.body}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Modal>
-  );
-}
 
 function Action({ icon, label, onClick, active }: { icon: ReactNode; label: string; onClick: () => void; active?: boolean }) {
   return (
@@ -90,11 +35,17 @@ function ReelItem({ post, muted, onToggleMute }: { post: Post; muted: boolean; o
   const ref = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [visible, setVisible] = useState(false);
+  const [near, setNear] = useState(false);
+  const [buffering, setBuffering] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const [comments, setComments] = useState(false);
   const like = useLike(post._id, Boolean(post.viewer?.liked));
   const save = useSavePost(post._id, Boolean(post.viewer?.saved));
   const follow = useFollow(post.author._id, false);
+  const mine = useIsMine(post.author._id);
   const viewSent = useRef(false);
 
   useEffect(() => {
@@ -102,8 +53,49 @@ function ReelItem({ post, muted, onToggleMute }: { post: Post; muted: boolean; o
     if (!el) return;
     const io = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting && entry.intersectionRatio > 0.6), { threshold: [0, 0.6, 1] });
     io.observe(el);
-    return () => io.disconnect();
+    // start fetching the next/previous reel slightly before it scrolls in
+    const pre = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), { rootMargin: "100% 0px 100% 0px" });
+    pre.observe(el);
+    return () => {
+      io.disconnect();
+      pre.disconnect();
+    };
   }, []);
+
+  /* the file's own address; a stored http:// link on an https site is blocked by the browser, so upgrade it */
+  const videoUrl = (() => {
+    const u = post.reel?.url;
+    if (!u) return undefined;
+    if (typeof window !== "undefined" && window.location.protocol === "https:" && u.startsWith("http://") && !/^http:\/\/(localhost|127\.)/.test(u)) return u.replace("http://", "https://");
+    return u;
+  })();
+
+  const explain = (code?: number) => {
+    if (videoUrl && /^https?:\/\/(localhost|127\.)/.test(videoUrl)) return "This video is saved on a local computer address, so other devices cannot reach it. Re-upload it after setting up cloud media storage.";
+    if (code === 4) return "The video file is missing or its format is not supported by this browser.";
+    if (code === 3) return "The video file looks damaged.";
+    if (code === 2) return "The connection dropped while loading the video.";
+    return "The video could not be loaded.";
+  };
+
+  const onVideoError = (v: HTMLVideoElement | null) => {
+    if (!v) return;
+    const code = v.error?.code ?? 4; // a failing <source> leaves error empty: treat as missing / unsupported
+    console.error("[reels] video failed", { src: v.currentSrc, code, message: v.error?.message });
+    setBuffering(false);
+    setReason(explain(code));
+    setFailed(true);
+  };
+
+  const retry = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    setFailed(false);
+    setReason(null);
+    setBuffering(true);
+    v.load();
+    v.play().catch(() => null);
+  };
 
   useEffect(() => {
     const v = videoRef.current;
@@ -144,18 +136,56 @@ function ReelItem({ post, muted, onToggleMute }: { post: Post; muted: boolean; o
         {post.reel?.url ? (
           <video
             ref={videoRef}
-            src={post.reel.url}
             poster={thumb || undefined}
+            key={videoUrl}
             muted={muted}
             loop
             playsInline
+            preload={visible ? "auto" : near ? "metadata" : "none"}
             className="absolute inset-0 h-full w-full object-cover"
             onClick={() => setPaused((p) => !p)}
-          />
+            onLoadStart={() => setBuffering(true)}
+            onWaiting={() => setBuffering(true)}
+            onStalled={() => setBuffering(true)}
+            onCanPlay={() => setBuffering(false)}
+            onPlaying={() => {
+              setBuffering(false);
+              setFailed(false);
+            }}
+            onError={(e) => onVideoError(e.currentTarget)}
+            onTimeUpdate={(e) => {
+              const v = e.currentTarget;
+              if (v.duration) setProgress(v.currentTime / v.duration);
+            }}
+          >
+            {/* "#t=0.001" makes the browser show the first frame instead of a black box.
+                .mov is declared as mp4 because Chrome only accepts the mp4 label (H.264 inside plays fine). */}
+            <source src={`${videoUrl}#t=0.001`} type={/\.webm($|\?)/i.test(videoUrl || "") ? "video/webm" : "video/mp4"} onError={(e) => onVideoError(e.currentTarget.parentElement as HTMLVideoElement)} />
+          </video>
         ) : (
-          <SmartImage src={thumb} alt={post.caption || "Reel"} hint={`${food?.name || ""} ${post.caption || ""}`} dark className="absolute inset-0" sizes="100vw" />
+          <SmartImage src={thumb} alt={post.caption || "Reel"} hint={`${food?.name || ""} ${post.caption || ""}`} className="absolute inset-0" sizes="100vw" />
         )}
         <div className="reel-shade pointer-events-none absolute inset-0" />
+        {post.reel?.url && buffering && !failed && !paused && visible && (
+          <div className="pointer-events-none absolute top-1/2 left-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 backdrop-blur" role="status" aria-label="Loading video">
+            <Spinner className="text-4xl !text-white" />
+          </div>
+        )}
+        {post.reel?.url && failed && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/55 p-6 text-center text-white">
+            <p className="text-sm font-semibold">Video could not load</p>
+            <p className="max-w-[16rem] text-xs text-white/70">{reason || "Check your connection and try again."}</p>
+            <button onClick={retry} className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-navy-900">
+              <LuRotateCw /> Retry
+            </button>
+            {videoUrl && (
+              <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-white/60 underline">
+                Open video link
+              </a>
+            )}
+          </div>
+        )}
+        {post.reel?.url && !failed && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-white/20"><div className="h-full bg-brand-500 transition-[width] duration-200" style={{ width: `${Math.round(progress * 100)}%` }} /></div>}
         {paused && (
           <button onClick={() => setPaused(false)} className="absolute top-1/2 left-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white" aria-label="Play">
             <LuPlay className="ml-1 fill-white text-2xl" />
@@ -179,9 +209,13 @@ function ReelItem({ post, muted, onToggleMute }: { post: Post; muted: boolean; o
                 {PROFILE_TYPE_LABEL[post.author.profileType || "RESTAURANT"]} · {timeAgo(post.createdAt)}
               </p>
             </div>
-            <button onClick={follow.toggle} className={cn("ml-1 rounded-full border px-3 py-1 text-xs font-semibold", follow.on ? "border-white/40 text-white/80" : "border-white bg-white text-navy-900")}>
-              {follow.on ? "Following" : "Follow"}
-            </button>
+            {mine ? (
+              <span className="ml-1 rounded-full border border-white/40 px-3 py-1 text-xs font-semibold text-white/80">Your reel</span>
+            ) : (
+              <button onClick={follow.toggle} className={cn("ml-1 rounded-full border px-3 py-1 text-xs font-semibold", follow.on ? "border-white/40 text-white/80" : "border-white bg-white text-navy-900")}>
+                {follow.on ? "Following" : "Follow"}
+              </button>
+            )}
           </div>
           {post.caption && <p className="mt-2 line-clamp-3 text-sm text-white/95">{post.caption}</p>}
           {food?._id && (
@@ -212,7 +246,7 @@ function ReelItem({ post, muted, onToggleMute }: { post: Post; muted: boolean; o
         <Action icon={<LuBookmark className={save.on ? "fill-brand-500" : ""} />} label="Save" onClick={save.toggle} active={save.on} />
         <Action icon={<LuShare2 />} label="Share" onClick={share} />
       </div>
-      <Comments post={post} open={comments} onClose={() => setComments(false)} />
+      <CommentsSheet post={post} open={comments} onClose={() => setComments(false)} />
     </div>
   );
 }

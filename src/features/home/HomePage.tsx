@@ -3,18 +3,20 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type FormEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode, type RefObject } from "react";
 import { LuChevronDown, LuChevronRight, LuFlame, LuGift, LuMapPin, LuPlay, LuSearch, LuSlidersHorizontal, LuSparkles, LuUtensilsCrossed, LuWandSparkles } from "react-icons/lu";
 
-import { FoodArt, HeroArt, type CuisineKey } from "@/components/brand/FoodArt";
+import type { CuisineKey } from "@/components/brand/FoodArt";
+import { FoodPhoto } from "@/components/ui/FoodPhoto";
 import { CreatorCard, CuisineCircle, DishCard, OfferBanner, PlaceCard, ReelCard } from "@/components/cards/Cards";
-import { Avatar, SectionHeader, Skeleton, scrollRow } from "@/components/ui";
+import { Avatar, Chip, SectionHeader, Skeleton, scrollRow } from "@/components/ui";
 import { SmartImage } from "@/components/ui/SmartImage";
-import { catalogApi, discoveryApi, recommendationApi, socialApi } from "@/services/foodmart";
+import { accountApi, catalogApi, discoveryApi, recommendationApi, socialApi } from "@/services/foodmart";
+import { MEALS } from "@/lib/meals";
 import { cn, formatCompact, primaryImage } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { CITIES, locationParams, useLocationStore } from "@/store/locationStore";
-import type { Post } from "@/lib/types";
+import type { MealSlot, Post } from "@/lib/types";
 
 /* =========================================================
    HOME (FoodMart design)
@@ -72,7 +74,7 @@ function MiniReel({ post, fallbackTitle, fallbackKind, views, className }: { pos
   const title = post ? post.linkedFood?.name || post.caption?.split("\n")[0] || fallbackTitle : fallbackTitle;
   return (
     <Link href={post ? `/reels?start=${post._id}` : "/reels"} className={cn("group relative block overflow-hidden rounded-2xl border-4 border-white bg-night-900 shadow-pop", className)}>
-      <SmartImage src={post ? post.reel?.thumbnailUrl || primaryImage(post.media) : null} alt={title} kind={post ? undefined : fallbackKind} hint={title} dark className="absolute inset-0 transition duration-500 group-hover:scale-105" />
+      <SmartImage src={post ? post.reel?.thumbnailUrl || primaryImage(post.media) : null} alt={title} kind={post ? undefined : fallbackKind} hint={title} className="absolute inset-0 transition duration-500 group-hover:scale-105" />
       <div className="reel-shade absolute inset-0" />
       <p className="absolute top-3 left-3 max-w-[70%] text-[15px] leading-tight font-bold text-white drop-shadow">{title}</p>
       <p className="absolute bottom-3 left-3 text-[11px] text-white/85">{post ? `${formatCompact(post.reel?.viewCount || post.stats?.views)} views` : views}</p>
@@ -110,8 +112,8 @@ function Hero({ reels }: { reels?: Post[] }) {
               <br />
               <span className="text-brand-gradient">You&apos;ll Love</span>
             </h1>
-            <div className="ml-auto h-28 w-28 shrink-0 md:hidden">
-              <FoodArt kind="biryani" />
+            <div className="ml-auto h-28 w-28 shrink-0 overflow-hidden rounded-full shadow-card ring-4 ring-white md:hidden">
+              <FoodPhoto kind="biryani" alt="" w={320} className="h-full w-full" />
             </div>
           </div>
           <p className="mt-4 max-w-md text-sm text-ink-600 sm:text-base">Explore amazing restaurants, hidden food points, top chefs, food bloggers and local flavors — all in one place.</p>
@@ -143,7 +145,7 @@ function Hero({ reels }: { reels?: Post[] }) {
             &nbsp;&nbsp;Days
             <LuWandSparkles className="absolute -top-3 -right-6 text-xl text-brand-500" />
           </p>
-          <HeroArt className="absolute top-0 right-0 h-[86%] w-auto max-w-full drop-shadow-2xl lg:right-auto lg:left-[14%] lg:max-w-[78%]" />
+          <FoodPhoto kind="biryani" alt="Biryani" w={900} className="absolute top-0 right-0 aspect-square h-[86%] w-auto max-w-full rounded-full shadow-2xl ring-8 ring-white lg:right-auto lg:left-[14%] lg:max-w-[78%]" />
           <Link href="/reels" className="grape-gradient absolute bottom-2 left-[18%] z-20 hidden w-[250px] items-center gap-3 rounded-2xl p-4 text-white shadow-grape lg:flex">
             <div className="min-w-0 flex-1">
               <p className="text-lg leading-tight font-semibold">
@@ -284,6 +286,59 @@ function TrendingAndNearby() {
   );
 }
 
+/* Meal that fits the hour on the visitor's own clock (set after mount so the server and browser HTML match). */
+const slotForHour = (hour: number): MealSlot => (hour < 11 ? "BREAKFAST" : hour < 16 ? "LUNCH" : hour < 19 ? "SNACK" : "DINNER");
+
+/* "Time for breakfast": the user's own favourites for that meal if they have any, otherwise popular dishes tagged for it. */
+function MealTime() {
+  const user = useAuthStore((s) => s.user);
+  const { city } = useLocationStore();
+  const ref = useRef<HTMLDivElement>(null);
+  const [slot, setSlot] = useState<MealSlot | null>(null);
+  useEffect(() => {
+    setSlot(slotForHour(new Date().getHours()));
+  }, []);
+  const mine = useQuery({ queryKey: ["home-meal-favs", user?._id, slot], queryFn: () => accountApi.favoriteFoods(slot as string), enabled: Boolean(user && slot) });
+  const popular = useQuery({ queryKey: ["home-meal-popular", slot, city], queryFn: () => catalogApi.foods({ mealType: slot, sort: "popular", city, limit: 10 }), enabled: Boolean(slot) });
+  if (!slot) return null;
+
+  const meal = MEALS.find((m) => m.value === slot)!;
+  const favs = (mine.data?.items || []).map((i) => i.food).filter(Boolean);
+  const foods = favs.length ? favs : popular.data?.items || [];
+  const loading = (Boolean(user) && mine.isLoading) || popular.isLoading;
+  if (!loading && !foods.length && !user) return null;
+
+  return (
+    <section className="container-fm py-5">
+      <SectionHeader
+        icon={<span aria-hidden>{meal.emoji}</span>}
+        title={`Time for ${meal.label.split(" (")[0].toLowerCase()}`}
+        subtitle={favs.length ? "Your favourites for this meal" : `Popular ${meal.label.split(" (")[0].toLowerCase()} dishes`}
+        href={`/explore?meal=${slot}`}
+        onPrev={() => scrollRow(ref.current, -1)}
+        onNext={() => scrollRow(ref.current, 1)}
+      />
+      <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto">
+        {MEALS.map((m) => (
+          <Chip key={m.value} active={slot === m.value} onClick={() => setSlot(m.value)}>
+            <span aria-hidden>{m.emoji}</span> {m.label.split(" (")[0]}
+          </Chip>
+        ))}
+      </div>
+      <Row rowRef={ref}>
+        {loading
+          ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-[230px] w-[46%] shrink-0 rounded-2xl sm:w-[220px]" />)
+          : foods.map((f) => <DishCard key={f._id} food={f} compact className="w-[46%] shrink-0 sm:w-[220px] xl:w-[calc((100%-64px)/5)]" />)}
+        {!loading && !foods.length && (
+          <p className="py-6 text-sm text-ink-500">
+            No dishes are tagged for {meal.label.split(" (")[0].toLowerCase()} yet. Tap the heart on a dish and choose this meal to see it here.
+          </p>
+        )}
+      </Row>
+    </section>
+  );
+}
+
 function SpecialOffers() {
   const ref = useRef<HTMLDivElement>(null);
   const trending = useQuery({ queryKey: ["home-trending-foods"], queryFn: () => discoveryApi.trending({ limit: 10 }) });
@@ -303,7 +358,12 @@ function SpecialOffers() {
 
 function OffersAndCreators() {
   const city = useLocationStore((s) => s.city);
-  const deals = useQuery({ queryKey: ["home-deals", city], queryFn: () => catalogApi.deals({ limit: 6 }) });
+  const deals = useQuery({ queryKey: ["home-deals", city], queryFn: async () => {
+      // this city's deals first; if it has none, fall back to deals from anywhere
+      const local = await catalogApi.deals({ city, limit: 6 });
+      return local.length ? local : catalogApi.deals({ preferCity: city, limit: 6 });
+    },
+  });
   const creators = useQuery({ queryKey: ["home-creators"], queryFn: () => discoveryApi.profiles({ type: "BLOGGER,CHEF", sort: "followers", limit: 12 }) });
   const deal = deals.data?.[0];
   if (!deal && !creators.data?.items.length) return null;
@@ -356,6 +416,7 @@ export default function HomePage() {
       <Hero reels={reels.data?.items} />
       <ForYou reels={reels.data?.items} loading={reels.isLoading} />
       <Cuisines />
+      <MealTime />
       <PickedForYou />
       <TrendingAndNearby />
       <SpecialOffers />

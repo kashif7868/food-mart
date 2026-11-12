@@ -3,10 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import { LuClock, LuFlame, LuTicketPercent } from "react-icons/lu";
+import { LuClock, LuFlame, LuPlay, LuShoppingBag, LuTicketPercent } from "react-icons/lu";
 
-import { dealLabel, DishCard } from "@/components/cards/Cards";
-import { Avatar, EmptyState, ErrorState, PageHeading, SectionHeader, Skeleton, Tabs } from "@/components/ui";
+import { dealLabel, DishCard, useDealOrder } from "@/components/cards/Cards";
+import { Avatar, Button, EmptyState, ErrorState, PageHeading, SectionHeader, Skeleton, Tabs } from "@/components/ui";
 import { SmartImage } from "@/components/ui/SmartImage";
 import { getErrorMessage } from "@/services/api";
 import { catalogApi, discoveryApi } from "@/services/foodmart";
@@ -28,33 +28,72 @@ const endsIn = (iso: string) => {
 
 function DealCard({ deal, index }: { deal: Deal & { profile: Profile; foods: Food[] }; index: number }) {
   const food = deal.foods?.[0];
+  const dealOrder = useDealOrder(deal);
+  const [playing, setPlaying] = useState(false);
+  const cover = deal.image?.url || deal.video?.thumbnailUrl || primaryImage(food?.media);
+  const tone = index % 3 === 0 ? "grape-gradient" : index % 3 === 1 ? "brand-gradient" : "bg-gradient-to-br from-night-800 to-night-950";
   return (
-    <Link
-      href={food?._id ? `/food/${food._id}` : profilePath(deal.profile)}
-      className={cn("group relative flex min-h-[170px] overflow-hidden rounded-3xl p-5 text-white shadow-pop transition hover:-translate-y-0.5", index % 3 === 0 ? "grape-gradient" : index % 3 === 1 ? "brand-gradient" : "bg-gradient-to-br from-night-800 to-night-950")}
-    >
-      <div className="relative z-10 flex max-w-[58%] flex-col">
-        <span className="inline-flex w-fit items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur">
+    <div className="flex flex-col overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-card transition hover:shadow-pop">
+      <div className="relative aspect-[16/9] w-full overflow-hidden bg-ink-100">
+        {playing && deal.video?.url ? (
+          <video src={deal.video.url} poster={deal.video.thumbnailUrl} className="h-full w-full object-cover" controls autoPlay playsInline />
+        ) : (
+          <>
+            <SmartImage src={cover} alt={food?.name || deal.title} hint={food?.name || deal.title} className="absolute inset-0 h-full w-full" />
+            {deal.video?.url && (
+              <button type="button" onClick={() => setPlaying(true)} aria-label="Play offer video" className="absolute inset-0 flex items-center justify-center bg-black/20 transition hover:bg-black/35">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-2xl text-brand-600 shadow-pop">
+                  <LuPlay />
+                </span>
+              </button>
+            )}
+          </>
+        )}
+        <span className={cn("absolute top-3 left-3 rounded-full px-3 py-1 text-sm font-extrabold text-white shadow", tone)}>{dealLabel(deal)}</span>
+        <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur">
           <LuClock /> {endsIn(deal.endsAt)}
         </span>
-        <p className="mt-2 text-2xl leading-tight font-extrabold">{dealLabel(deal)}</p>
-        <p className="mt-1 line-clamp-2 text-sm text-white/90">{deal.title}</p>
-        {deal.minOrderAmount ? <p className="mt-1 text-[11px] text-white/75">On orders above {formatPKR(deal.minOrderAmount)}</p> : null}
-        <div className="mt-auto flex items-center gap-2 pt-3">
-          <Avatar src={deal.profile?.avatar?.url} name={deal.profile?.displayName} size={26} ring />
-          <span className="truncate text-xs font-semibold">{deal.profile?.displayName}</span>
+      </div>
+      <div className="flex flex-1 flex-col p-4">
+        <p className="line-clamp-1 text-base font-bold text-navy-900">{deal.title}</p>
+        {deal.description && <p className="mt-0.5 line-clamp-2 text-xs text-ink-500">{deal.description}</p>}
+        <Link href={profilePath(deal.profile)} className="mt-2 flex items-center gap-2">
+          <Avatar src={deal.profile?.avatar?.url} name={deal.profile?.displayName} size={24} ring />
+          <span className="truncate text-xs font-semibold text-ink-700">{deal.profile?.displayName}</span>
+        </Link>
+        <p className="mt-2 text-[11px] text-ink-500">
+          {dealOrder.foods.length ? `On ${dealOrder.foods.map((f) => f.name).slice(0, 2).join(", ")}${dealOrder.foods.length > 2 ? ` +${dealOrder.foods.length - 2} more` : ""}` : "On the whole menu"}
+          {deal.minOrderAmount ? ` · orders above ${formatPKR(deal.minOrderAmount)}` : ""}
+        </p>
+        <div className="mt-auto flex gap-2 pt-3">
+          <Button className="flex-1" icon={<LuShoppingBag />} loading={dealOrder.busy} disabled={dealOrder.mine} onClick={dealOrder.order}>
+            {dealOrder.label}
+          </Button>
+          <Link href={profilePath(deal.profile)} className="inline-flex items-center rounded-xl border border-ink-200 px-3 text-xs font-semibold text-ink-700 hover:bg-ink-50">
+            Menu
+          </Link>
         </div>
       </div>
-      <div className="absolute -right-6 -bottom-6 h-44 w-44 rounded-full bg-white/10" />
-      <SmartImage src={primaryImage(food?.media)} alt={food?.name || deal.title} hint={food?.name || deal.profile?.cuisines?.join(" ")} className="absolute right-4 bottom-4 h-28 w-28 rounded-2xl shadow-pop transition group-hover:scale-105 sm:h-32 sm:w-32" />
-    </Link>
+    </div>
   );
 }
 
 export default function OffersPage() {
   const city = useLocationStore((s) => s.city);
   const [scope, setScope] = useState<"city" | "all">("city");
-  const deals = useQuery({ queryKey: ["offers", scope, city], queryFn: () => catalogApi.deals({ city: scope === "city" ? city : undefined, limit: 30 }) });
+  const deals = useQuery({
+    queryKey: ["offers", scope, city],
+    // "In <city>" = only that city. "All Pakistan" = everything, nearest city first.
+    queryFn: async () => {
+      const list = await catalogApi.deals(scope === "city" ? { city, limit: 30 } : { preferCity: city, limit: 40 });
+      if (scope === "city") return list;
+      const mine = (d: (typeof list)[number]) => (d.profile?.address?.city || "").toLowerCase() === city.toLowerCase();
+      return [...list].sort((a, b) => Number(mine(b)) - Number(mine(a)));
+    },
+  });
+  const isLocal = (d: { profile?: Profile }) => (d.profile?.address?.city || "").toLowerCase() === city.toLowerCase();
+  const nearby = scope === "all" ? (deals.data || []).filter(isLocal) : [];
+  const others = scope === "all" ? (deals.data || []).filter((d) => !isLocal(d)) : [];
   const trending = useQuery({ queryKey: ["offers-trending"], queryFn: () => discoveryApi.trending({ limit: 10 }) });
 
   return (
@@ -70,16 +109,51 @@ export default function OffersPage() {
       ) : deals.isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-[170px] rounded-3xl" />
+            <div key={i} className="overflow-hidden rounded-3xl border border-ink-100 bg-white">
+              <Skeleton className="aspect-[16/9] w-full rounded-none" />
+              <div className="space-y-2 p-4">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-9 w-full rounded-xl" />
+              </div>
+            </div>
           ))}
         </div>
       ) : !deals.data?.length ? (
-        <EmptyState icon={<LuTicketPercent />} title={`No live offers ${scope === "city" ? `in ${city}` : ""} right now`} text="Check back soon - partners add new deals every day." />
-      ) : (
+        <EmptyState
+          icon={<LuTicketPercent />}
+          title={scope === "city" ? `No live offers in ${city} right now` : "No live offers right now"}
+          text="Check back soon - partners add new deals every day."
+          action={scope === "city" ? <Button variant="outline" onClick={() => setScope("all")}>See offers across Pakistan</Button> : undefined}
+        />
+      ) : scope === "city" ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {deals.data.map((d, i) => (
             <DealCard key={d._id} deal={d} index={i} />
           ))}
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {nearby.length > 0 && (
+            <div>
+              <p className="mb-3 text-sm font-bold text-navy-900">Near you · {city}</p>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {nearby.map((d, i) => (
+                  <DealCard key={d._id} deal={d} index={i} />
+                ))}
+              </div>
+            </div>
+          )}
+          {others.length > 0 && (
+            <div>
+              <p className="mb-3 text-sm font-bold text-navy-900">{nearby.length ? "More across Pakistan" : `Nothing in ${city} yet - offers from other cities`}</p>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {others.map((d, i) => (
+                  <DealCard key={d._id} deal={d} index={i + nearby.length} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -6,7 +6,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { LuBadgeCheck, LuHash, LuSearch, LuSlidersHorizontal, LuUtensilsCrossed, LuX } from "react-icons/lu";
 
 import { DishCard, PlaceCard, ReelCard } from "@/components/cards/Cards";
-import { Button, EmptyState, ErrorState, Modal, Skeleton, Tabs } from "@/components/ui";
+import { Button, Chip, EmptyState, ErrorState, Modal, Skeleton, Tabs } from "@/components/ui";
+import { MEALS } from "@/lib/meals";
 import { getErrorMessage } from "@/services/api";
 import { catalogApi, discoveryApi, socialApi } from "@/services/foodmart";
 import { cn } from "@/lib/utils";
@@ -101,16 +102,23 @@ export default function ExplorePage() {
   const [term, setTerm] = useState(q);
   const [tab, setTab] = useState<Tab>("dishes");
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  /* breakfast / lunch / dinner...: shows dishes sellers tagged for that meal (?meal=BREAKFAST) */
+  const [meal, setMeal] = useState(() => {
+    const m = (params.get("meal") || "").toUpperCase();
+    return MEALS.some((x) => x.value === m) ? m : "";
+  });
   const [showFilters, setShowFilters] = useState(params.get("filters") === "1");
   const { city, coords } = useLocationStore();
 
-  useEffect(() => setTerm(q), [q]);
+  useEffect(() => {
+    setTerm(q);
+  }, [q]);
 
   const searching = q.trim().length >= 2;
   const search = useQuery({ queryKey: ["search", q], queryFn: () => discoveryApi.search(q, "all", 24), enabled: searching });
 
   const dishes = useInfiniteQuery({
-    queryKey: ["explore-dishes", filters, city, coords],
+    queryKey: ["explore-dishes", filters, meal, city, coords],
     initialPageParam: 1,
     enabled: !searching && tab === "dishes",
     queryFn: async ({ pageParam }) => {
@@ -118,7 +126,7 @@ export default function ExplorePage() {
         const r = await discoveryApi.nearby({ type: "foods", radiusKm: 5, limit: 40, maxPrice: filters.maxPrice || undefined, verified: filters.verified || undefined, ...locationParams({ city, coords }) });
         return { items: r.items, meta: { page: 1, totalPages: 1 } };
       }
-      const base = { sort: filters.sort || undefined, maxPrice: filters.maxPrice || undefined, sellerType: filters.sellerType || undefined, verified: filters.verified || undefined, page: pageParam, limit: 20 };
+      const base = { mealType: meal || undefined, sort: filters.sort || undefined, maxPrice: filters.maxPrice || undefined, sellerType: filters.sellerType || undefined, verified: filters.verified || undefined, page: pageParam, limit: 20 };
       const r = await catalogApi.foods({ ...base, city });
       /* nothing listed in this city yet -> show dishes from all cities */
       if (!r.items.length && pageParam === 1) {
@@ -162,6 +170,19 @@ export default function ExplorePage() {
           {activeFilters > 0 && <span className="brand-gradient absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white">{activeFilters}</span>}
         </button>
       </form>
+
+      {!searching && tab === "dishes" && (
+        <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto" role="group" aria-label="Meal">
+          <Chip active={meal === ""} onClick={() => setMeal("")}>
+            All meals
+          </Chip>
+          {MEALS.map((m) => (
+            <Chip key={m.value} active={meal === m.value} onClick={() => setMeal(m.value)}>
+              <span aria-hidden>{m.emoji}</span> {m.label.split(" (")[0]}
+            </Chip>
+          ))}
+        </div>
+      )}
 
       {!searching && (
         <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto sm:gap-3">

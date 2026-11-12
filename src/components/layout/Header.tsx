@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   LuChevronDown,
   LuCrosshair,
@@ -21,6 +22,7 @@ import {
 import { toast } from "sonner";
 
 import { Logo } from "@/components/brand/Logo";
+import { LanguageButton, PrefsPanel, ThemeButton } from "@/components/layout/PrefsToggle";
 import { Avatar } from "@/components/ui";
 import { cartCount, useCart } from "@/hooks/useCart";
 import { cn } from "@/lib/utils";
@@ -46,7 +48,8 @@ export const NAV = [
   { href: "/food-points", label: "Food Points" },
 ];
 
-export const DASHBOARD_URL = (process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:5173").replace(/\/$/, "");
+import { DASHBOARD_URL } from "@/lib/config";
+export { DASHBOARD_URL };
 
 const isActive = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
 
@@ -55,7 +58,11 @@ function useClickOutside(onOutside: () => void) {
   useEffect(() => {
     const handler = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && onOutside();
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler as unknown as EventListener, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler as unknown as EventListener);
+    };
   }, [onOutside]);
   return ref;
 }
@@ -118,13 +125,13 @@ export function SearchBox({ className, placeholder = "Search for restaurants, cu
   };
   return (
     <form onSubmit={submit} className={cn("relative", className)} role="search">
-      <LuSearch className="absolute top-1/2 left-4 -translate-y-1/2 text-lg text-ink-500" />
+      <LuSearch className="absolute top-1/2 start-4 -translate-y-1/2 text-lg text-ink-500" />
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder={placeholder}
         aria-label="Search FoodMart"
-        className="h-11 w-full rounded-full border border-ink-200 bg-white pr-4 pl-11 text-[13px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-300 focus:ring-4 focus:ring-brand-100"
+        className="h-11 w-full rounded-full border border-ink-200 bg-white pe-4 ps-11 text-[13px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-brand-300 focus:ring-4 focus:ring-brand-100"
       />
     </form>
   );
@@ -198,14 +205,16 @@ export function Header() {
   const { user, ready } = useAuthStore();
   const [drawer, setDrawer] = useState(false);
 
-  useEffect(() => setDrawer(false), [pathname]);
+  useEffect(() => {
+    setDrawer(false);
+  }, [pathname]);
 
   const authButtons = (
-    <div className="flex items-center gap-2">
-      <Link href="/login" className="inline-flex h-10 items-center rounded-full border-2 border-grape-600 px-5 text-sm font-semibold text-grape-700 transition hover:bg-grape-50">
+    <div className="flex w-full items-center gap-2 lg:w-auto">
+      <Link href="/login" className="inline-flex h-11 flex-1 items-center justify-center rounded-full border-2 border-grape-600 px-5 lg:h-10 lg:flex-none text-sm font-semibold text-grape-700 transition hover:bg-grape-50">
         Sign In
       </Link>
-      <Link href="/signup" className="grape-gradient inline-flex h-10 items-center rounded-full px-5 text-sm font-semibold text-white shadow-grape transition hover:brightness-110">
+      <Link href="/signup" className="grape-gradient inline-flex h-11 flex-1 items-center justify-center rounded-full px-5 lg:h-10 lg:flex-none text-sm font-semibold text-white shadow-grape transition hover:brightness-110">
         Sign Up
       </Link>
     </div>
@@ -222,6 +231,8 @@ export function Header() {
         <LocationPicker className="hidden lg:block" />
         <SearchBox className="mx-1 min-w-0 flex-1 lg:mx-3" />
         <LocationPicker compact className="lg:hidden" />
+        <LanguageButton className="hidden lg:flex" />
+        <ThemeButton />
         <Link href="/favourites" className="flex h-10 w-10 items-center justify-center rounded-full text-ink-800 transition hover:bg-ink-50" aria-label="Favourites">
           <LuHeart className="text-[22px]" />
         </Link>
@@ -255,45 +266,86 @@ export function Header() {
         </button>
         <Logo size={28} />
         <div className="flex items-center">
+          <LanguageButton className="h-9 px-2" />
+          <ThemeButton className="h-9 w-9" />
           <Link href="/explore" className="rounded-full p-2 text-ink-800" aria-label="Search">
             <LuSearch className="text-[22px]" />
           </Link>
-          {user && <CartButton />}
+          {user ? (
+            <CartButton />
+          ) : (
+            ready && (
+              <Link href="/login" className="grape-gradient ml-1 inline-flex h-8 items-center rounded-full px-3.5 text-xs font-semibold text-white">
+                Sign In
+              </Link>
+            )
+          )}
         </div>
       </div>
 
-      {/* drawer (mobile + tablet) */}
-      {drawer && (
-        <div className="fixed inset-0 z-[70] lg:hidden">
-          <div className="absolute inset-0 bg-night-950/50" onClick={() => setDrawer(false)} />
-          <aside className="animate-fade-up absolute inset-y-0 left-0 flex w-[300px] flex-col bg-white shadow-pop">
-            <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
-              <Logo size={30} />
-              <button onClick={() => setDrawer(false)} className="rounded-full p-2 text-ink-500 hover:bg-ink-100" aria-label="Close menu">
-                <LuX className="text-xl" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <LocationPicker className="mb-4 md:hidden" />
-              <nav className="grid gap-1">
-                {NAV.map((l) => (
-                  <Link key={l.href} href={l.href} className={cn("rounded-xl px-3 py-2.5 text-sm font-medium", isActive(pathname, l.href) ? "bg-brand-50 text-brand-600" : "text-ink-700 hover:bg-ink-50")}>
-                    {l.label}
-                  </Link>
-                ))}
-                <Link href="/awards" className="rounded-xl px-3 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50">
-                  FoodMart Awards
-                </Link>
-                <Link href="/partner" className="rounded-xl px-3 py-2.5 text-sm font-semibold text-grape-700 hover:bg-grape-50">
-                  Partner with us
-                </Link>
-              </nav>
-            </div>
-            <div className="border-t border-ink-100 p-4">{user ? <AccountMenuInline /> : authButtons}</div>
-          </aside>
-        </div>
-      )}
+      <MenuDrawer open={drawer} onClose={() => setDrawer(false)} pathname={pathname} authButtons={authButtons} user={Boolean(user)} />
     </header>
+  );
+}
+
+/* The drawer is rendered in a portal on <body>. Inside the header it would be
+   clipped to the header's height, because `backdrop-blur` makes the header the
+   containing block of every `position: fixed` child. */
+function MenuDrawer({ open, onClose, pathname, authButtons, user }: { open: boolean; onClose: () => void; pathname: string; authButtons: ReactNode; user: boolean }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  if (!mounted || !open) return null;
+  const link = "flex items-center rounded-xl px-3 py-3 text-[15px] font-medium";
+  return createPortal(
+    <div className="fixed inset-0 z-[80] lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+      <div className="absolute inset-0 bg-night-950/55 backdrop-blur-[2px]" onClick={onClose} />
+      <aside className="animate-drawer-in absolute inset-y-0 start-0 flex h-dvh w-[86%] max-w-[320px] flex-col bg-white shadow-pop">
+        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
+          <Logo size={30} />
+          <button onClick={onClose} className="rounded-full p-2 text-ink-500 hover:bg-ink-100" aria-label="Close menu">
+            <LuX className="text-xl" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4">
+          <LocationPicker className="mb-4 md:hidden" />
+          <div className="mb-4">
+            <PrefsPanel />
+          </div>
+          <nav className="grid gap-1" onClick={onClose}>
+            {NAV.map((l) => (
+              <Link key={l.href} href={l.href} className={cn(link, isActive(pathname, l.href) ? "bg-brand-50 text-brand-600" : "text-ink-700 hover:bg-ink-50")}>
+                {l.label}
+              </Link>
+            ))}
+            <Link href="/awards" className={cn(link, "text-ink-700 hover:bg-ink-50")}>
+              FoodMart Awards
+            </Link>
+            <Link href="/partner" className={cn(link, "font-semibold text-grape-700 hover:bg-grape-50")}>
+              Partner with us
+            </Link>
+          </nav>
+        </div>
+        <div className="border-t border-ink-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" onClick={onClose}>
+          {user ? <AccountMenuInline /> : authButtons}
+        </div>
+      </aside>
+    </div>,
+    document.body
   );
 }
 

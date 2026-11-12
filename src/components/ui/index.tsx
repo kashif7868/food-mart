@@ -298,15 +298,15 @@ export function Modal({ open, onClose, title, children, footer, size = "md" }: {
   return createPortal(
     <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-night-950/55 backdrop-blur-[2px]" onClick={onClose} />
-      <div className={cn("animate-fade-up relative flex max-h-[92vh] w-full flex-col rounded-t-3xl bg-white shadow-pop sm:rounded-3xl", size === "sm" ? "sm:max-w-md" : size === "lg" ? "sm:max-w-3xl" : "sm:max-w-lg")}>
+      <div className={cn("animate-fade-up relative flex max-h-[92dvh] w-full flex-col rounded-t-3xl bg-white shadow-pop sm:rounded-3xl", size === "sm" ? "sm:max-w-md" : size === "lg" ? "sm:max-w-3xl" : "sm:max-w-lg")}>
         <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
           <div className="font-bold text-navy-900">{title}</div>
           <button onClick={onClose} className="rounded-full p-1.5 text-ink-500 hover:bg-ink-100" aria-label="Close">
             <LuX className="text-lg" />
           </button>
         </div>
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-ink-100 px-5 py-3">{footer}</div>}
+        <div className="overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
+        {footer && <div className="flex justify-end gap-2 border-t border-ink-100 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</div>}
       </div>
     </div>,
     document.body

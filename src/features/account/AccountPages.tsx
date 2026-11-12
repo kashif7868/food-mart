@@ -22,15 +22,18 @@ import {
 } from "react-icons/lu";
 
 import { DishCard, PlaceCard, ReelCard } from "@/components/cards/Cards";
+import { MealPickerModal } from "@/components/cards/MealPicker";
+import { MealReminders } from "./MealReminders";
+import { MEALS, mealsText } from "@/lib/meals";
 import { DASHBOARD_URL } from "@/components/layout/Header";
 import { RequireAuth } from "@/components/layout/RequireAuth";
-import { Avatar, Badge, Button, EmptyState, Field, Input, Modal, PageHeading, Select, Skeleton, Tabs } from "@/components/ui";
+import { Avatar, Badge, Button, Chip, EmptyState, Field, Input, Modal, PageHeading, Select, Skeleton, Tabs } from "@/components/ui";
 import { getErrorMessage } from "@/services/api";
-import { accountApi, authApi, notificationApi } from "@/services/foodmart";
+import { accountApi, authApi, notificationApi, socialApi } from "@/services/foodmart";
 import { cn, PROFILE_TYPE_LABEL, timeAgo } from "@/lib/utils";
 import { partnerProfiles, useAuthStore } from "@/store/authStore";
 import { CITIES } from "@/store/locationStore";
-import type { Address } from "@/lib/types";
+import type { Address, Food, MealSlot } from "@/lib/types";
 
 /* =========================================================
    ACCOUNT: profile · food preferences · addresses · password
@@ -346,7 +349,9 @@ function Account() {
 
 function Favourites() {
   const [tab, setTab] = useState<"dishes" | "saved" | "following">("dishes");
-  const foods = useQuery({ queryKey: ["fav-foods"], queryFn: accountApi.favoriteFoods, enabled: tab === "dishes" });
+  const [meal, setMeal] = useState<MealSlot | "">("");
+  const [editing, setEditing] = useState<{ food: Food; slots: MealSlot[] } | null>(null);
+  const foods = useQuery({ queryKey: ["fav-foods", meal], queryFn: () => accountApi.favoriteFoods(meal || undefined), enabled: tab === "dishes" });
   const saved = useQuery({ queryKey: ["saved-posts"], queryFn: accountApi.savedPosts, enabled: tab === "saved" });
   const following = useQuery({ queryKey: ["following"], queryFn: accountApi.following, enabled: tab === "following" });
   const loading = tab === "dishes" ? foods.isLoading : tab === "saved" ? saved.isLoading : following.isLoading;
@@ -369,15 +374,60 @@ function Favourites() {
       {loading ? (
         <Skeleton className="h-60" />
       ) : tab === "dishes" ? (
-        foods.data?.items.length ? (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
-            {foods.data.items.map(({ food }) => (
-              <DishCard key={food._id} food={{ ...food, viewer: { isFavorite: true } } as never} compact />
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <Chip active={meal === ""} onClick={() => setMeal("")}>
+              All
+            </Chip>
+            {MEALS.map((m) => (
+              <Chip key={m.value} active={meal === m.value} onClick={() => setMeal(m.value)}>
+                <span aria-hidden>{m.emoji}</span> {m.label.split(" (")[0]}
+              </Chip>
             ))}
+            <Link href="/notifications#meals" className="ml-auto text-xs font-semibold text-brand-600 hover:underline">
+              Meal reminder times
+            </Link>
           </div>
-        ) : (
-          <EmptyState icon={<LuHeart />} title="No favourite dishes yet" text="Tap the heart on any dish to save it here." />
-        )
+          {foods.data?.items.length ? (
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
+              {foods.data.items.map(({ food, mealSlots }) => (
+                <div key={food._id}>
+                  <DishCard food={{ ...food, viewer: { isFavorite: true, mealSlots } } as never} compact />
+                  <button
+                    onClick={() => setEditing({ food, slots: mealSlots || [] })}
+                    className="mt-1.5 w-full truncate rounded-lg bg-ink-50 px-2 py-1 text-[11px] font-medium text-ink-600 hover:bg-brand-50 hover:text-brand-600"
+                  >
+                    {mealSlots?.length ? mealsText(mealSlots) : "Choose a meal"} · Edit
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<LuHeart />}
+              title={meal ? "No favourites for this meal yet" : "No favourite dishes yet"}
+              text={meal ? "Open a favourite dish and tap Edit to file it under this meal." : "Tap the heart on any dish to save it here."}
+            />
+          )}
+          <MealPickerModal
+            open={!!editing}
+            onClose={() => setEditing(null)}
+            initial={editing?.slots || []}
+            dishName={editing?.food.name}
+            onSave={async (slots) => {
+              if (!editing) return false;
+              try {
+                await socialApi.favoriteMeals(editing.food._id, slots);
+                toast.success("Meals saved");
+                foods.refetch();
+                return true;
+              } catch (error) {
+                toast.error(getErrorMessage(error));
+                return false;
+              }
+            }}
+          />
+        </>
       ) : tab === "saved" ? (
         saved.data?.items.length ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -417,6 +467,7 @@ function Notifications() {
           </Button>
         }
       />
+      <MealReminders />
       {list.isLoading ? (
         <Skeleton className="h-60" />
       ) : !list.data?.items.length ? (

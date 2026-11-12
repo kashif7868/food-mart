@@ -9,7 +9,8 @@
 ========================================================= */
 
 @theme {
-  --font-sans: var(--font-poppins), "Poppins", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-sans: var(--font-jakarta), "Plus Jakarta Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: var(--font-outfit), "Outfit", var(--font-jakarta), "Segoe UI", sans-serif;
   --font-script: var(--font-caveat), "Segoe Script", "Brush Script MT", cursive;
 
   --breakpoint-xs: 420px;
@@ -75,6 +76,11 @@
   --shadow-grape: 0 10px 24px rgba(109, 40, 217, 0.3);
 
   --animate-fade-up: fade-up 0.45s ease both;
+  --animate-drawer-in: drawer-in 0.22s ease-out both;
+  @keyframes drawer-in {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+  }
   @keyframes fade-up {
     from {
       opacity: 0;
@@ -94,6 +100,27 @@
 
   body {
     @apply bg-white font-sans text-ink-800 antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Custom typography: display font for headings, tight and confident */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: #ffd9bd;
+    color: #7a2d00;
+  }
+
+  :focus-visible {
+    outline: 2px solid #ff6b1a;
+    outline-offset: 2px;
+    border-radius: 6px;
   }
 
   button:not(:disabled),
@@ -178,4 +205,88 @@
   &::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* ---------- mobile polish ---------- */
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body { overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+img, video { max-width: 100%; }
+/* 16px text in form controls stops iOS Safari from zooming into inputs */
+@media (max-width: 767px) {
+  input, select, textarea { font-size: 16px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* =========================================================
+   DARK THEME  (html.dark) - swaps the colour tokens, so every
+   existing utility (text-ink-*, bg-ink-*, brand tints) follows.
+========================================================= */
+html.dark {
+  --color-brand-50: #3a2214;
+  --color-brand-100: #4d2c18;
+  --color-brand-200: #6b3a1c;
+  --color-grape-50: #2a1f4a;
+  --color-grape-100: #372a62;
+  --color-grape-200: #4b3a85;
+  --color-navy-700: #cfc8ee;
+  --color-navy-800: #e2ddf6;
+  --color-navy-900: #f4f1ff;
+  --color-ink-50: #211a38;
+  --color-ink-100: #2b2347;
+  --color-ink-200: #3b3259;
+  --color-ink-300: #5b4f7b;
+  --color-ink-400: #8c82a8;
+  --color-ink-500: #a9a0c1;
+  --color-ink-600: #c2bbd6;
+  --color-ink-700: #d7d1e7;
+  --color-ink-800: #ebe7f4;
+  --color-ink-900: #f8f6fc;
+  --color-success-50: #0f2a1e;
+  --color-danger-50: #331616;
+  --color-warning-50: #33260d;
+  --color-info-50: #17213f;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-pop: 0 18px 40px rgba(0, 0, 0, 0.55);
+}
+html.dark body { background: #120d1f; }
+html.dark .bg-white,
+html.dark .field { background-color: #1b1530; }
+html.dark .bg-white\/95,
+html.dark .bg-white\/90 { background-color: rgba(27, 21, 48, 0.92); }
+html.dark .from-white { --tw-gradient-from: #1b1530; }
+html.dark .via-white { --tw-gradient-via: #1b1530; }
+html.dark .to-white { --tw-gradient-to: #1b1530; }
+html.dark .border-white { border-color: #1b1530; }
+html.dark .ring-white { --tw-ring-color: #1b1530; }
+html.dark .hero-glow {
+  background:
+    radial-gradient(40% 55% at 82% 30%, rgba(255, 138, 61, 0.16) 0%, transparent 70%),
+    radial-gradient(35% 50% at 95% 75%, rgba(124, 58, 237, 0.2) 0%, transparent 70%);
+}
+html.dark .footer-gradient { background: linear-gradient(135deg, #0d0719 0%, #130a24 50%, #0a0514 100%); }
+html.dark img { filter: brightness(0.92); }
+html.dark .brand-gradient,
+html.dark .grape-gradient { color: #fff; }
+
+/* =========================================================
+   URDU (html.lang-ur, dir=rtl)
+========================================================= */
+html.lang-ur body,
+html.lang-ur button,
+html.lang-ur input,
+html.lang-ur select,
+html.lang-ur textarea {
+  font-family: var(--font-naskh), "Noto Naskh Arabic", "Segoe UI", Tahoma, sans-serif;
+}
+html.lang-ur * { letter-spacing: 0 !important; }
+html.lang-ur body { line-height: 1.75; }
+html.lang-ur h1, html.lang-ur h2, html.lang-ur h3 { line-height: 1.5 !important; }
+html[dir="rtl"] .rtl-flip { transform: scaleX(-1); }
+html[dir="rtl"] .animate-drawer-in { animation-name: drawer-in-rtl; }
+@keyframes drawer-in-rtl {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }

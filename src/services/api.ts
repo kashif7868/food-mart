@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "@/lib/config";
 import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 
 /* =========================================================
@@ -11,7 +12,13 @@ import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestCo
    - Backend success shape: { success, message, data, meta? }
 ========================================================= */
 
-export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "http://localhost:5000/api/v1").replace(/\/+$/, "");
+
+
+export { API_BASE_URL };
+
+if (typeof window !== "undefined" && window.location.hostname !== "localhost" && /localhost|127\.0\.0\.1/.test(API_BASE_URL)) {
+  console.warn(`[FoodMart] NEXT_PUBLIC_API_BASE_URL points to ${API_BASE_URL}. Set it to your live API URL in the hosting environment variables and redeploy.`);
+}
 
 const isBrowser = () => typeof window !== "undefined" && typeof localStorage !== "undefined";
 

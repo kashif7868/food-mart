@@ -64,7 +64,11 @@ export function Footer() {
   const pathname = usePathname() || "/";
   /* reels page is full screen on mobile */
   if (pathname.startsWith("/reels")) return <div className="hidden md:block"><FooterBody /></div>;
-  return <FooterBody />;
+  return (
+    <div className="pb-[calc(3.75rem+env(safe-area-inset-bottom))] md:pb-0">
+      <FooterBody />
+    </div>
+  );
 }
 
 function FooterBody() {

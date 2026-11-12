@@ -104,6 +104,8 @@ export interface FoodCategory {
   children?: FoodCategory[];
 }
 
+export type MealSlot = "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK" | "JUICE" | "DESSERT";
+
 export interface Food {
   _id: ID;
   seller: ID | Partial<Profile>;
@@ -115,6 +117,7 @@ export interface Food {
   cuisine?: string;
   tags?: string[];
   ingredients?: string[];
+  mealTypes?: MealSlot[];
   price: number;
   currency: string;
   media: MediaRef[];
@@ -143,6 +146,8 @@ export interface Deal {
   startsAt: string;
   endsAt: string;
   isActive: boolean;
+  image?: { asset?: ID; url?: string };
+  video?: { asset?: ID; url?: string; thumbnailUrl?: string; durationSeconds?: number };
 }
 
 export type OrderStatus = "PENDING" | "ACCEPTED" | "PREPARING" | "READY" | "COMPLETED" | "REJECTED" | "CANCELLED";
@@ -179,6 +184,16 @@ export interface Order {
   statusHistory: { from: string | null; to: string; actorType: string; reason?: string; at: string }[];
   paymentMethod: string;
   paymentStatus: string;
+  paymentAction?: {
+    type: "REDIRECT" | "RETRY" | "WALLET_INSTRUCTIONS";
+    provider?: string;
+    url?: string;
+    message?: string;
+    method?: string;
+    amount?: number;
+    destination?: { number: string; accountTitle: string; owner: string } | null;
+    instructions?: string;
+  } | null;
   createdAt: string;
   completedAt?: string;
   cancelReason?: string;

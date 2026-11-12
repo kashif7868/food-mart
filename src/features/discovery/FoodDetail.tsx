@@ -6,6 +6,8 @@ import { useState } from "react";
 import { LuBadgeCheck, LuChevronRight, LuClock, LuHeart, LuMinus, LuPlus, LuShoppingBag, LuStore, LuTicketPercent } from "react-icons/lu";
 
 import { dealLabel, DishCard } from "@/components/cards/Cards";
+import { FavoriteMealPicker } from "@/components/cards/MealPicker";
+import { mealsText } from "@/lib/meals";
 import { Avatar, Badge, Button, ErrorState, PageLoader, Rating } from "@/components/ui";
 import { SmartImage } from "@/components/ui/SmartImage";
 import { useAddToCart } from "@/hooks/useCart";
@@ -34,7 +36,7 @@ export default function FoodDetail({ id }: { id: string }) {
 function FoodView({ food, reviews, reviewsLoading, similar }: { food: NonNullable<Awaited<ReturnType<typeof catalogApi.food>>>; reviews?: any[]; reviewsLoading: boolean; similar: any[] }) {
   const [qty, setQty] = useState(1);
   const [active, setActive] = useState(0);
-  const fav = useFavorite(food._id, Boolean(food.viewer?.isFavorite));
+  const fav = useFavorite(food._id, Boolean(food.viewer?.isFavorite), food.viewer?.mealSlots);
   const cart = useAddToCart();
   const seller = food.seller;
   const images = food.media?.length ? food.media : [{ url: "", isPrimary: true }];
@@ -67,6 +69,13 @@ function FoodView({ food, reviews, reviewsLoading, similar }: { food: NonNullabl
               <LuHeart className={cn("text-xl", fav.on && "fill-brand-500 text-brand-500")} />
             </button>
           </div>
+          {fav.on && (
+            <button onClick={fav.openPicker} className="mt-3 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3.5 py-1.5 text-xs font-semibold text-brand-600">
+              <LuHeart className="fill-brand-500 text-brand-500" />
+              {fav.slots.length ? `Favourite for ${mealsText(fav.slots)}` : "Choose a meal for this favourite"} · Edit
+            </button>
+          )}
+          <FavoriteMealPicker fav={fav} name={food.name} />
           {food.media?.length > 1 && (
             <div className="mt-3 flex gap-2">
               {food.media.map((m, i) => (
@@ -132,7 +141,7 @@ function FoodView({ food, reviews, reviewsLoading, similar }: { food: NonNullabl
                 <LuPlus />
               </button>
             </div>
-            <Button size="lg" icon={<LuShoppingBag />} disabled={!orderable} loading={cart.isPending} onClick={() => cart.add(food._id, food.name, qty)} className="flex-1 sm:flex-none">
+            <Button size="lg" icon={<LuShoppingBag />} disabled={!orderable} loading={cart.isPending} onClick={() => cart.add(food._id, food.name, qty, typeof food.seller === "object" ? food.seller?._id : (food.seller as string))} className="flex-1 sm:flex-none">
               Add to cart · {formatPKR(food.price * qty)}
             </Button>
           </div>

@@ -7,7 +7,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { LuArrowRight, LuChefHat, LuCircleCheck, LuCompass, LuExternalLink, LuEye, LuEyeOff, LuMailCheck, LuStore, LuUtensilsCrossed } from "react-icons/lu";
 
-import { HeroArt } from "@/components/brand/FoodArt";
+import { FoodPhoto } from "@/components/ui/FoodPhoto";
 import { Logo } from "@/components/brand/Logo";
 import { DASHBOARD_URL } from "@/components/layout/Header";
 import { Button, Field, Input, Select } from "@/components/ui";
@@ -29,7 +29,7 @@ const safeNext = (next: string | null) => (next && next.startsWith("/") && !next
 
 export function AuthShell({ title, subtitle, children, side }: { title: string; subtitle?: string; children: ReactNode; side?: ReactNode }) {
   return (
-    <div className="container-fm grid min-h-[calc(100vh-120px)] items-center gap-10 py-8 lg:grid-cols-2">
+    <div className="container-fm grid min-h-[calc(100dvh-120px)] items-center gap-10 py-8 lg:grid-cols-2">
       <div className="relative hidden h-full min-h-[520px] overflow-hidden rounded-[32px] bg-gradient-to-br from-brand-50 via-white to-grape-50 p-10 lg:block">
         <Logo />
         <h2 className="mt-8 max-w-sm text-4xl leading-tight font-extrabold text-navy-900">
@@ -40,7 +40,7 @@ export function AuthShell({ title, subtitle, children, side }: { title: string; 
           )}
         </h2>
         <p className="mt-3 max-w-sm text-sm text-ink-600">Order from restaurants, home chefs and street-food spots, watch food reels and follow your favourite bloggers.</p>
-        <HeroArt className="absolute bottom-6 left-1/2 w-[78%] max-w-[440px] -translate-x-1/2" />
+        <FoodPhoto kind="biryani" alt="" w={800} className="absolute bottom-6 left-1/2 aspect-square w-[70%] max-w-[380px] -translate-x-1/2 rounded-full shadow-2xl ring-8 ring-white" />
       </div>
       <div className="mx-auto w-full max-w-md">
         <h1 className="text-3xl font-extrabold text-navy-900">{title}</h1>

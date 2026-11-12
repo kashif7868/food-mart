@@ -1,5 +1,6 @@
 "use client";
 
+import { PaymentPanel } from "./PaymentPanel";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -207,6 +208,9 @@ function OrderDetail({ id }: { id: string }) {
               </div>
             )}
           </section>
+
+          {!failed && <PaymentPanel orderId={o._id} returned={params.get("payment") === "success"} />}
+          {failed && o.paymentStatus === "PAID" && <PaymentPanel orderId={o._id} />}
 
           {o.reviewEligibility && (
             <section className="card p-5">

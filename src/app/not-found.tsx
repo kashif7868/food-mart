@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-import { FoodArt } from "@/components/brand/FoodArt";
+import { FoodPhoto } from "@/components/ui/FoodPhoto";
 
 export default function NotFound() {
   return (
     <div className="container-fm flex min-h-[60vh] flex-col items-center justify-center py-16 text-center">
-      <div className="h-36 w-36">
-        <FoodArt kind="burger" />
+      <div className="h-36 w-36 overflow-hidden rounded-full shadow-card ring-4 ring-white">
+        <FoodPhoto kind="burger" alt="" w={320} className="h-full w-full" />
       </div>
       <p className="mt-4 text-6xl font-extrabold text-brand-gradient">404</p>
       <h1 className="mt-2 text-xl font-bold text-navy-900">This page is off the menu</h1>

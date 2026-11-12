@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 
 import { useAuthStore } from "@/store/authStore";
 import { useLocationStore } from "@/store/locationStore";
+import { usePrefs } from "@/store/prefsStore";
 
 /* React Query + toasts + session/location restore */
 export function Providers({ children }: { children: ReactNode }) {
@@ -17,11 +18,13 @@ export function Providers({ children }: { children: ReactNode }) {
   );
   const initialize = useAuthStore((s) => s.initialize);
   const hydrate = useLocationStore((s) => s.hydrate);
+  const hydratePrefs = usePrefs((s) => s.hydrate);
 
   useEffect(() => {
     hydrate();
+    hydratePrefs();
     void initialize();
-  }, [initialize, hydrate]);
+  }, [initialize, hydrate, hydratePrefs]);
 
   return (
     <QueryClientProvider client={client}>
